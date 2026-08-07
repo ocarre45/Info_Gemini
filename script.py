@@ -1,18 +1,23 @@
 import os
 import datetime
+import base64
 import requests
 import docx
-import base64
+from google import genai
+from google.genai import types
 
-# 1. Clés d'API
+# 1. Verification des clés d'environnement
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 BREVO_KEY = os.getenv("BREVO_API_KEY")
-EMAIL_SENDER = "votre-email@domaine.com"  # ⚠️ REMPLACEZ PAR VOTRE EMAIL BREVO VALIDÉ
+EMAIL_SENDER = "votre-email@domaine.com"  # ⚠️ Remplacez par votre e-mail d'expéditeur validé dans Brevo
 
 if not GEMINI_KEY or not BREVO_KEY:
-    raise ValueError("GEMINI_API_KEY ou BREVO_API_KEY est manquante.")
+    raise ValueError("Les variables d'environnement GEMINI_API_KEY ou BREVO_API_KEY sont manquantes.")
 
-# 2. Prompt
+# 2. Configuration du client Gemini
+client = genai.Client(api_key=GEMINI_KEY)
+
+# 3. Prompt de la veille
 PROMPT = """Rôle et objectif
 Tu es un analyste spécialisé en politiques publiques et dynamiques de terrain du logement social et abordable. Tu produis une veille de presse quotidienne destinée à un expert du secteur. Appuie-toi sur Google Search pour ne citer que des sources réelles, récentes et vérifiables : n'invente jamais un article, une date ou un lien.
 
@@ -51,30 +56,32 @@ Structure et mise en forme (Format compatible Word) :
 - Pays sans actualité retenue : [Noms]
 """
 
-# 3. Requête HTTP vers le modèle Gemini Flash le plus récent (gemini-2.5-flash / gemini-flash-latest)
-gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_KEY}"
+# 4. Appel de l'API Gemini avec Google Search Grounding
+# Modèles essayés successivement en cas de mise à jour des versions
+models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest"]
+texte_veille = None
 
-payload_gemini = {
-    "contents": [{"parts": [{"text": PROMPT}]}],
-    "tools": [{"google_search": {}}]
-}
+for model_name in models_to_try:
+    try:
+        print(f"Tentative de génération avec le modèle : {model_name}")
+        response = client.models.generate_content(
+            model=model_name,
+            contents=PROMPT,
+            config=types.GenerateContentConfig(
+                tools=[types.Tool(google_search=types.GoogleSearch())]
+            )
+        )
+        if response and response.text:
+            texte_veille = response.text
+            print(f"Génération réussie avec {model_name} !")
+            break
+    except Exception as e:
+        print(f"Échec avec {model_name}: {e}")
 
-response = requests.post(gemini_url, json=payload_gemini)
-res_json = response.json()
+if not texte_veille:
+    raise RuntimeError("Impossible de générer le contenu de la veille avec les modèles Gemini disponibles.")
 
-# En cas de problème de version, tenter avec l'alias générique 'gemini-flash-latest'
-if response.status_code != 200:
-    print("Tentative avec gemini-2.5-flash échouée :", res_json)
-    gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={GEMINI_KEY}"
-    response = requests.post(gemini_url, json=payload_gemini)
-    res_json = response.json()
-
-try:
-    texte_veille = res_json['candidates'][0]['content']['parts'][0]['text']
-except (KeyError, IndexError):
-    raise Exception(f"Impossible de lire la réponse Gemini : {res_json}")
-
-# 4. Génération du fichier Word (.docx)
+# 5. Création du fichier Word (.docx)
 doc = docx.Document()
 doc.add_heading("Veille Logement Social", level=1)
 
@@ -84,8 +91,9 @@ for paragraph in texte_veille.split('\n\n'):
 today_str = datetime.date.today().strftime('%d/%m/%Y')
 filename = f"Veille_Logement_Social_{datetime.date.today()}.docx"
 doc.save(filename)
+print(f"Document Word enregistré sous : {filename}")
 
-# 5. Envoi par e-mail via Brevo
+# 6. Envoi de l'e-mail via Brevo API REST
 with open(filename, "rb") as f:
     encoded_file = base64.b64encode(f.read()).decode("utf-8")
 
@@ -110,7 +118,7 @@ payload_brevo = {
 }
 
 res_brevo = requests.post(brevo_url, json=payload_brevo, headers=headers_brevo)
-print("Statut Brevo :", res_brevo.status_code, res_brevo.text)
+print("Statut d'envoi Brevo :", res_brevo.status_code, res_brevo.text)
 
 if res_brevo.status_code >= 400:
-    raise Exception(f"Erreur Brevo : {res_brevo.text}")
+    raise RuntimeError(f"Erreur d'envoi Brevo : {res_brevo.text}")
