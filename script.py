@@ -7,15 +7,18 @@ from google.genai import types
 # 1. Vérification des clés d'environnement
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 BREVO_KEY = os.getenv("BREVO_API_KEY")
-EMAIL_SENDER = "votre-email@domaine.com"  # ⚠️ Votre e-mail d'expéditeur validé dans Brevo
+
+# 2. Paramètres d'expéditeur et de la liste Brevo
+EMAIL_SENDER = "ocfr@yahoo.fr"
+LIST_ID_BREVO = 3  # Liste #3 (LISTEOC)
 
 if not GEMINI_KEY or not BREVO_KEY:
-    raise ValueError("GEMINI_API_KEY ou BREVO_API_KEY est manquante.")
+    raise ValueError("GEMINI_API_KEY ou BREVO_API_KEY est manquante dans les variables d'environnement.")
 
-# 2. Configuration du client Gemini
+# 3. Configuration du client Gemini
 client = genai.Client(api_key=GEMINI_KEY)
 
-# 3. Prompt de la veille
+# 4. Prompt de la veille
 PROMPT = """Rôle et objectif
 Tu es un analyste spécialisé en politiques publiques et dynamiques de terrain du logement social et abordable. Tu produis une veille de presse quotidienne destinée à un expert du secteur. Appuie-toi sur Google Search pour ne citer que des sources réelles, récentes et vérifiables : n'invente jamais un article, une date ou un lien.
 
@@ -35,13 +38,13 @@ Structure et mise en forme HTML :
 Génère le texte directement formaté en HTML simple (utilises <h2>, <h3>, <ul>, <li>, <b>, <a href="...">) pour qu'il s'affiche parfaitement dans un e-mail. Ne mets pas de balises ```html ou ``` autour.
 """
 
-# 4. Appel de l'API Gemini
+# 5. Appel de l'API Gemini avec recherche web
 models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest"]
 texte_html = None
 
 for model_name in models_to_try:
     try:
-        print(f"Tentative de génération avec {model_name}...")
+        print(f"Tentative de génération avec le modèle : {model_name}...")
         response = client.models.generate_content(
             model=model_name,
             contents=PROMPT,
@@ -57,12 +60,12 @@ for model_name in models_to_try:
         print(f"Échec avec {model_name}: {e}")
 
 if not texte_html:
-    raise RuntimeError("Impossible de générer la veille avec les modèles disponibles.")
+    raise RuntimeError("Impossible de générer la veille avec les modèles Gemini disponibles.")
 
-# Nettoyage si Gemini ajoute des balises de code Markdown
+# Nettoyage des balises Markdown résiduelles
 texte_html = texte_html.replace("```html", "").replace("```", "").strip()
 
-# 5. Envoi de l'e-mail via Brevo (texte dans le corps)
+# 6. Envoi de l'e-mail via Brevo à la liste #3
 today_str = datetime.date.today().strftime('%d/%m/%Y')
 
 brevo_url = "https://api.brevo.com/v3/smtp/email"
@@ -73,10 +76,10 @@ headers_brevo = {
 }
 
 payload_brevo = {
-    "sender": {"name": "Veille Logement", "email": EMAIL_SENDER},
-    "to": [{"email": EMAIL_SENDER}],
+    "sender": {"name": "Veille Logement Social", "email": EMAIL_SENDER},
+    "listIds": [LIST_ID_BREVO],
     "subject": f"Actualité du Logement Social au {today_str}",
-    "htmlContent": f"<div>{texte_html}</div>"
+    "htmlContent": f"<div style='font-family: Arial, sans-serif; line-height: 1.5;'>{texte_html}</div>"
 }
 
 res_brevo = requests.post(brevo_url, json=payload_brevo, headers=headers_brevo)
