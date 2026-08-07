@@ -51,33 +51,27 @@ Structure et mise en forme (Format compatible Word) :
 - Pays sans actualité retenue : [Noms]
 """
 
-# 3. Requête HTTP directe vers Gemini (sans passer par un SDK sujet aux bugs)
-gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_KEY}"
+# 3. Requête HTTP directe vers Gemini avec gestion automatique des secours
+gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_KEY}"
 
 payload_gemini = {
-    "contents": [
-        {
-            "parts": [{"text": PROMPT}]
-        }
-    ],
-    "tools": [
-        {"google_search": {}}
-    ]
+    "contents": [{"parts": [{"text": PROMPT}]}],
+    "tools": [{"google_search": {}}]
 }
 
 response = requests.post(gemini_url, json=payload_gemini)
 res_json = response.json()
 
+# Si le modèle v1beta échoue, bascule automatique sur le point d'entrée v1 stable
 if response.status_code != 200:
-    print("Erreur Gemini API :", res_json)
-    # Repli de secours sans la recherche Google si quota/droit restreint
-    gemini_url_fallback = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_KEY}"
-    response = requests.post(gemini_url_fallback, json={"contents": [{"parts": [{"text": PROMPT}]}]})
+    print("Tentative v1beta échouée, bascule sur v1 :", res_json)
+    gemini_url = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key={GEMINI_KEY}"
+    response = requests.post(gemini_url, json={"contents": [{"parts": [{"text": PROMPT}]}]})
     res_json = response.json()
 
 try:
     texte_veille = res_json['candidates'][0]['content']['parts'][0]['text']
-except KeyError:
+except (KeyError, IndexError):
     raise Exception(f"Impossible de lire la réponse Gemini : {res_json}")
 
 # 4. Génération du fichier Word (.docx)
