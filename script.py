@@ -10,6 +10,9 @@ from google.genai import types
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 BREVO_KEY = os.getenv("BREVO_API_KEY")
 
+if not GEMINI_KEY or not BREVO_KEY:
+    raise ValueError("Les clés API GEMINI_API_KEY ou BREVO_API_KEY ne sont pas définies dans les secrets GitHub.")
+
 # Initialisation du client officiel Google GenAI
 client = genai.Client(api_key=GEMINI_KEY)
 
@@ -60,24 +63,23 @@ Structure le document de manière claire pour faciliter un copier-coller propre 
 - Pays sans actualité retenue dans la fenêtre des 24h : [Nom des pays le cas échéant]
 """
 
-# 1. Configuration du client
-client = genai.Client(api_key=GEMINI_KEY)
-
-# 2. Appel de l'API avec le modèle courant
+# 2. Appel à l'API Gemini avec modèle canonique et recherche Google
 response = client.models.generate_content(
-    model='gemini-2.5-flash',
+    model='gemini-1.5-pro',
     contents=PROMPT,
     config=types.GenerateContentConfig(
         tools=[types.Tool(google_search=types.GoogleSearch())]
     )
 )
 
-texte_veille = response.text
+texte_veille = response.text if response.text else "Aucun contenu généré."
 
 # 3. Génération du fichier Word (.docx)
 doc = docx.Document()
 doc.add_heading("Veille Logement Social", level=1)
-doc.add_paragraph(texte_veille)
+
+for line in texte_veille.split('\n'):
+    doc.add_paragraph(line)
 
 today_str = datetime.date.today().strftime('%d/%m/%Y')
 filename = f"Veille_Logement_Social_{datetime.date.today()}.docx"
@@ -94,11 +96,14 @@ headers = {
     "content-type": "application/json"
 }
 
+# ⚠️ N'oubliez pas de mettre votre email d'expéditeur validé dans Brevo !
+EMAIL_SENDER = "ocfr@yahoo.fr" 
+
 payload = {
-    "sender": {"name": "Veille Logement", "email": "ocfr@yahoo.fr"}, # Remplacez par votre email Brevo
-    "to": [{"email": "votre-email@domaine.com"}], # Remplacez par le destinataire ou l'email de réception
+    "sender": {"name": "Veille Logement", "email": EMAIL_SENDER},
+    "to": [{"email": EMAIL_SENDER}],
     "subject": f"Actualité du Logement Social au {today_str}",
-    "htmlContent": f"<h3>Bonjour,</h3><p>Voici la veille quotidienne sur le logement social du {today_str} en pièce jointe.</p><hr/><pre>{texte_veille}</pre>",
+    "htmlContent": f"<h3>Bonjour,</h3><p>Voici la veille quotidienne sur le logement social du {today_str} en pièce jointe.</p>",
     "attachment": [
         {
             "content": encoded_file,
@@ -109,3 +114,5 @@ payload = {
 
 res = requests.post(brevo_url, json=payload, headers=headers)
 print("Statut d'envoi Brevo :", res.status_code, res.text)
+if res.status_code >= 400:
+    raise Exception(f"Erreur d'envoi Brevo: {res.text}")
