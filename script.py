@@ -70,42 +70,20 @@ if not texte_html:
 # Nettoyage des balises Markdown résiduelles
 texte_html = texte_html.replace("```html", "").replace("```", "").strip()
 
-# 6. Récupération des destinataires de la Liste Brevo #3
+# 6. Envoi de l'e-mail via Brevo SMTP à toute la liste
+today_str = datetime.date.today().strftime("%d/%m/%Y")
+brevo_smtp_url = "https://api.brevo.com/v3/smtp/email"
+
 headers_brevo = {
     "accept": "application/json",
     "api-key": BREVO_KEY,
     "content-type": "application/json",
 }
 
-print(f"Récupération des contacts de la liste Brevo ID {LIST_ID_BREVO}...")
-get_contacts_url = (
-    f"[https://api.brevo.com/v3/contacts/lists/](https://api.brevo.com/v3/contacts/lists/){LIST_ID_BREVO}/contacts"
-)
-res_contacts = requests.get(get_contacts_url, headers=headers_brevo)
-
-if res_contacts.status_code != 200:
-    raise RuntimeError(
-        "Impossible de récupérer les contacts de la liste Brevo :"
-        f" {res_contacts.text}"
-    )
-
-contacts_data = res_contacts.json().get("contacts", [])
-recipients = [{"email": c["email"]} for c in contacts_data if "email" in c]
-
-if not recipients:
-    raise RuntimeError(
-        f"Aucun contact trouvé dans la liste Brevo ID {LIST_ID_BREVO}."
-    )
-
-print(f"{len(recipients)} destinataire(s) trouvé(s).")
-
-# 7. Envoi de l'e-mail via Brevo SMTP
-today_str = datetime.date.today().strftime("%d/%m/%Y")
-brevo_smtp_url = "[https://api.brevo.com/v3/smtp/email](https://api.brevo.com/v3/smtp/email)"
-
+# Brevo accepte directement le champ "listIds" sans avoir besoin d'un champ "to"
 payload_brevo = {
     "sender": {"name": "Veille Logement Social", "email": EMAIL_SENDER},
-    "to": recipients,
+    "listIds": [LIST_ID_BREVO],
     "subject": f"Actualité du Logement Social au {today_str}",
     "htmlContent": (
         "<div style='font-family: Arial, sans-serif; line-height:"
