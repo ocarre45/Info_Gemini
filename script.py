@@ -68,4 +68,55 @@ if not texte_html:
     )
 
 # Nettoyage des balises Markdown résiduelles
-texte_html = texte_html.replace("```html", "").replace("
+texte_html = texte_html.replace("```html", "").replace("```", "").strip()
+
+# 6. Récupération des destinataires de la Liste Brevo #3
+headers_brevo = {
+    "accept": "application/json",
+    "api-key": BREVO_KEY,
+    "content-type": "application/json",
+}
+
+print(f"Récupération des contacts de la liste Brevo ID {LIST_ID_BREVO}...")
+get_contacts_url = (
+    f"[https://api.brevo.com/v3/contacts/lists/](https://api.brevo.com/v3/contacts/lists/){LIST_ID_BREVO}/contacts"
+)
+res_contacts = requests.get(get_contacts_url, headers=headers_brevo)
+
+if res_contacts.status_code != 200:
+    raise RuntimeError(
+        "Impossible de récupérer les contacts de la liste Brevo :"
+        f" {res_contacts.text}"
+    )
+
+contacts_data = res_contacts.json().get("contacts", [])
+recipients = [{"email": c["email"]} for c in contacts_data if "email" in c]
+
+if not recipients:
+    raise RuntimeError(
+        f"Aucun contact trouvé dans la liste Brevo ID {LIST_ID_BREVO}."
+    )
+
+print(f"{len(recipients)} destinataire(s) trouvé(s).")
+
+# 7. Envoi de l'e-mail via Brevo SMTP
+today_str = datetime.date.today().strftime("%d/%m/%Y")
+brevo_smtp_url = "[https://api.brevo.com/v3/smtp/email](https://api.brevo.com/v3/smtp/email)"
+
+payload_brevo = {
+    "sender": {"name": "Veille Logement Social", "email": EMAIL_SENDER},
+    "to": recipients,
+    "subject": f"Actualité du Logement Social au {today_str}",
+    "htmlContent": (
+        "<div style='font-family: Arial, sans-serif; line-height:"
+        f" 1.5;'>{texte_html}</div>"
+    ),
+}
+
+res_brevo = requests.post(
+    brevo_smtp_url, json=payload_brevo, headers=headers_brevo
+)
+print("Statut d'envoi Brevo :", res_brevo.status_code, res_brevo.text)
+
+if res_brevo.status_code >= 400:
+    raise RuntimeError(f"Erreur d'envoi Brevo : {res_brevo.text}")
