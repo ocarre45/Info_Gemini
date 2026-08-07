@@ -10,9 +10,9 @@ Variables d'environnement requises :
     BREVO_API_KEY    clé API v3 Brevo
 
 Variables optionnelles :
-    SENDER_EMAIL     ocfr@yahoo.fr
-    SENDER_NAME      PP MANIA
-    BREVO_LIST_ID    3
+    SENDER_EMAIL     expéditeur (défaut : veille@oliviercarre.fr)
+    SENDER_NAME      nom d'expéditeur
+    BREVO_LIST_ID    id de la liste Brevo (défaut : 3)
     REPLY_TO         adresse de réponse
     GEMINI_MODEL     surcharge du modèle
     DRY_RUN          "1" = génère et écrit veille.html sans rien envoyer
