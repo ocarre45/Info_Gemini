@@ -9,7 +9,7 @@ from google.genai import types
 # 1. Verification des clés d'environnement
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 BREVO_KEY = os.getenv("BREVO_API_KEY")
-EMAIL_SENDER = "votre-email@domaine.com"  # ⚠️ Remplacez par votre e-mail d'expéditeur validé dans Brevo
+EMAIL_SENDER = "ocfr@yahoo.fr"  # ⚠️ Remplacez par votre e-mail d'expéditeur validé dans Brevo
 
 if not GEMINI_KEY or not BREVO_KEY:
     raise ValueError("Les variables d'environnement GEMINI_API_KEY ou BREVO_API_KEY sont manquantes.")
