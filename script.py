@@ -49,7 +49,7 @@ with open(filename, "rb") as f:
     encoded_file = base64.b64encode(f.read()).decode("utf-8")
 
 payload = {
-    "sender": {"name": "Veille Logement", "email": "votre-email@domaine.com"},
+    "sender": {"name": "Veille Logement", "email": "ocfr@yahoo.fr"},
     # Pour envoyer directement à un ID de liste Brevo :
     "templateId": 1, # ID d'un template Brevo si vous en utilisez un, ou utilisez le corps HTML
     "htmlContent": f"<h3>Bonjour,</h3><p>Voici la veille du jour en pièce jointe.</p><br/><pre>{texte_veille}</pre>",
