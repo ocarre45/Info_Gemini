@@ -1,5 +1,5 @@
-import os
 import datetime
+import os
 import requests
 from google import genai
 from google.genai import types
@@ -13,7 +13,10 @@ EMAIL_SENDER = "ocfr@yahoo.fr"
 LIST_ID_BREVO = 3  # Liste #3 (LISTEOC)
 
 if not GEMINI_KEY or not BREVO_KEY:
-    raise ValueError("GEMINI_API_KEY ou BREVO_API_KEY est manquante dans les variables d'environnement.")
+    raise ValueError(
+        "GEMINI_API_KEY ou BREVO_API_KEY est manquante dans les variables"
+        " d'environnement."
+    )
 
 # 3. Configuration du client Gemini
 client = genai.Client(api_key=GEMINI_KEY)
@@ -27,7 +30,7 @@ Périmètre géographique et thématique
 - Sujet : Logement social et abordable au sens large (macro-politiques ET vie locale/terrain).
   • France : HLM, logement abordable/intermédiaire, bailleurs sociaux, financements (RLS, PLAI/PLUS/PLS, Action Logement, CDC), arbitrages maires/préfets/collectivités, décisions judiciaires/expulsions, tensions de terrain, vie des organismes, santé financière, associations de locataires, précarité énergétique.
   • Allemagne : sozialer Wohnungsbau, Sozialwohnungen, geförderter Wohnraum, Wohnraumförderung, kommunale/genossenschaftliche Wohnungsunternehmen, décisions des Länder et communes, initiatives syndicales (DGB/Mieterbund), reconversions, conflits d'usage.
-  • Italie : edilizia residenziale pubblica (ERP), case popolari, housing sociale, canone calmierato, bandi régionaux/municipaux (ALER, ATER), syndicats de locataires (SUNIA, Unione Inquilini), expulsions (sfratti), réhabilitations et initiatives locales.
+  • Italie : edilizia residenziale pública (ERP), case popolari, housing sociale, canone calmierato, bandi régionaux/municipaux (ALER, ATER), syndicats de locataires (SUNIA, Unione Inquilini), expulsions (sfratti), réhabilitations et initiatives locales.
 
 Sélection et signaux faibles
 - Ne te limite PAS aux annonces ministérielles ou aux grandes lois. Recherche activement les SIGNAUX FAIBLES et la PRESSE RÉGIONALE/LOCALE.
@@ -39,7 +42,7 @@ Génère le texte directement formaté en HTML simple (utilises <h2>, <h3>, <ul>
 """
 
 # 5. Appel de l'API Gemini avec recherche web
-models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest"]
+models_to_try = ["gemini-flash-latest"]
 texte_html = None
 
 for model_name in models_to_try:
@@ -50,7 +53,7 @@ for model_name in models_to_try:
             contents=PROMPT,
             config=types.GenerateContentConfig(
                 tools=[types.Tool(google_search=types.GoogleSearch())]
-            )
+            ),
         )
         if response and response.text:
             texte_html = response.text
@@ -60,30 +63,9 @@ for model_name in models_to_try:
         print(f"Échec avec {model_name}: {e}")
 
 if not texte_html:
-    raise RuntimeError("Impossible de générer la veille avec les modèles Gemini disponibles.")
+    raise RuntimeError(
+        "Impossible de générer la veille avec les modèles Gemini disponibles."
+    )
 
 # Nettoyage des balises Markdown résiduelles
-texte_html = texte_html.replace("```html", "").replace("```", "").strip()
-
-# 6. Envoi de l'e-mail via Brevo à la liste #3
-today_str = datetime.date.today().strftime('%d/%m/%Y')
-
-brevo_url = "https://api.brevo.com/v3/smtp/email"
-headers_brevo = {
-    "accept": "application/json",
-    "api-key": BREVO_KEY,
-    "content-type": "application/json"
-}
-
-payload_brevo = {
-    "sender": {"name": "Veille Logement Social", "email": EMAIL_SENDER},
-    "listIds": [LIST_ID_BREVO],
-    "subject": f"Actualité du Logement Social au {today_str}",
-    "htmlContent": f"<div style='font-family: Arial, sans-serif; line-height: 1.5;'>{texte_html}</div>"
-}
-
-res_brevo = requests.post(brevo_url, json=payload_brevo, headers=headers_brevo)
-print("Statut d'envoi Brevo :", res_brevo.status_code, res_brevo.text)
-
-if res_brevo.status_code >= 400:
-    raise RuntimeError(f"Erreur d'envoi Brevo : {res_brevo.text}")
+texte_html = texte_html.replace("```html", "").replace("
