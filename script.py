@@ -1,18 +1,16 @@
 import os
 import datetime
-import base64
 import requests
-import docx
 from google import genai
 from google.genai import types
 
-# 1. Verification des clés d'environnement
+# 1. Vérification des clés d'environnement
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 BREVO_KEY = os.getenv("BREVO_API_KEY")
-EMAIL_SENDER = "ocfr@yahoo.fr"  # ⚠️ Remplacez par votre e-mail d'expéditeur validé dans Brevo
+EMAIL_SENDER = "votre-email@domaine.com"  # ⚠️ Votre e-mail d'expéditeur validé dans Brevo
 
 if not GEMINI_KEY or not BREVO_KEY:
-    raise ValueError("Les variables d'environnement GEMINI_API_KEY ou BREVO_API_KEY sont manquantes.")
+    raise ValueError("GEMINI_API_KEY ou BREVO_API_KEY est manquante.")
 
 # 2. Configuration du client Gemini
 client = genai.Client(api_key=GEMINI_KEY)
@@ -33,37 +31,17 @@ Sélection et signaux faibles
 - Sélectionne jusqu'à 20 informations au total.
 - Fenêtre temporelle : 24 dernières heures.
 
-Structure et mise en forme (Format compatible Word) :
-# Actualité du Logement Social au [Date du jour]
-**Heure de création :** [Heure actuelle] | **Périmètre :** France, Allemagne, Italie | **Informations retenues :** [Nombre total]
-
----
-
-# 🇫🇷 France
-- **Titre :** [Titre]
-- **Synthèse :** [Résumé factuel]
-- **Source :** [Nom], [Date] — [URL]
-
-# 🇩🇪 Allemagne
-[Même structure]
-
-# 🇮🇹 Italie
-[Même structure]
-
----
-**Bilan de la veille :**
-- Total d'items : [X]
-- Pays sans actualité retenue : [Noms]
+Structure et mise en forme HTML :
+Génère le texte directement formaté en HTML simple (utilises <h2>, <h3>, <ul>, <li>, <b>, <a href="...">) pour qu'il s'affiche parfaitement dans un e-mail. Ne mets pas de balises ```html ou ``` autour.
 """
 
-# 4. Appel de l'API Gemini avec Google Search Grounding
-# Modèles essayés successivement en cas de mise à jour des versions
+# 4. Appel de l'API Gemini
 models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest"]
-texte_veille = None
+texte_html = None
 
 for model_name in models_to_try:
     try:
-        print(f"Tentative de génération avec le modèle : {model_name}")
+        print(f"Tentative de génération avec {model_name}...")
         response = client.models.generate_content(
             model=model_name,
             contents=PROMPT,
@@ -72,30 +50,20 @@ for model_name in models_to_try:
             )
         )
         if response and response.text:
-            texte_veille = response.text
+            texte_html = response.text
             print(f"Génération réussie avec {model_name} !")
             break
     except Exception as e:
         print(f"Échec avec {model_name}: {e}")
 
-if not texte_veille:
-    raise RuntimeError("Impossible de générer le contenu de la veille avec les modèles Gemini disponibles.")
+if not texte_html:
+    raise RuntimeError("Impossible de générer la veille avec les modèles disponibles.")
 
-# 5. Création du fichier Word (.docx)
-doc = docx.Document()
-doc.add_heading("Veille Logement Social", level=1)
+# Nettoyage si Gemini ajoute des balises de code Markdown
+texte_html = texte_html.replace("```html", "").replace("```", "").strip()
 
-for paragraph in texte_veille.split('\n\n'):
-    doc.add_paragraph(paragraph)
-
+# 5. Envoi de l'e-mail via Brevo (texte dans le corps)
 today_str = datetime.date.today().strftime('%d/%m/%Y')
-filename = f"Veille_Logement_Social_{datetime.date.today()}.docx"
-doc.save(filename)
-print(f"Document Word enregistré sous : {filename}")
-
-# 6. Envoi de l'e-mail via Brevo API REST
-with open(filename, "rb") as f:
-    encoded_file = base64.b64encode(f.read()).decode("utf-8")
 
 brevo_url = "https://api.brevo.com/v3/smtp/email"
 headers_brevo = {
@@ -108,13 +76,7 @@ payload_brevo = {
     "sender": {"name": "Veille Logement", "email": EMAIL_SENDER},
     "to": [{"email": EMAIL_SENDER}],
     "subject": f"Actualité du Logement Social au {today_str}",
-    "htmlContent": f"<h3>Bonjour,</h3><p>Voici votre veille quotidienne du {today_str} en pièce jointe.</p>",
-    "attachment": [
-        {
-            "content": encoded_file,
-            "name": filename
-        }
-    ]
+    "htmlContent": f"<div>{texte_html}</div>"
 }
 
 res_brevo = requests.post(brevo_url, json=payload_brevo, headers=headers_brevo)
