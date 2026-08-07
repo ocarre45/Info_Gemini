@@ -51,8 +51,8 @@ Structure et mise en forme (Format compatible Word) :
 - Pays sans actualité retenue : [Noms]
 """
 
-# 3. Requête HTTP directe vers Gemini avec gestion automatique des secours
-gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_KEY}"
+# 3. Requête HTTP vers le modèle Gemini Flash le plus récent (gemini-2.5-flash / gemini-flash-latest)
+gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_KEY}"
 
 payload_gemini = {
     "contents": [{"parts": [{"text": PROMPT}]}],
@@ -62,11 +62,11 @@ payload_gemini = {
 response = requests.post(gemini_url, json=payload_gemini)
 res_json = response.json()
 
-# Si le modèle v1beta échoue, bascule automatique sur le point d'entrée v1 stable
+# En cas de problème de version, tenter avec l'alias générique 'gemini-flash-latest'
 if response.status_code != 200:
-    print("Tentative v1beta échouée, bascule sur v1 :", res_json)
-    gemini_url = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key={GEMINI_KEY}"
-    response = requests.post(gemini_url, json={"contents": [{"parts": [{"text": PROMPT}]}]})
+    print("Tentative avec gemini-2.5-flash échouée :", res_json)
+    gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={GEMINI_KEY}"
+    response = requests.post(gemini_url, json=payload_gemini)
     res_json = response.json()
 
 try:
