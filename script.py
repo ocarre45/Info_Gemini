@@ -60,9 +60,12 @@ Structure le document de manière claire pour faciliter un copier-coller propre 
 - Pays sans actualité retenue dans la fenêtre des 24h : [Nom des pays le cas échéant]
 """
 
-# 2. Appel à l'API Gemini avec activation de Google Search en direct
+# 1. Configuration du client
+client = genai.Client(api_key=GEMINI_KEY)
+
+# 2. Appel de l'API avec le modèle courant
 response = client.models.generate_content(
-    model='gemini-2.0-flash',
+    model='gemini-2.5-flash',
     contents=PROMPT,
     config=types.GenerateContentConfig(
         tools=[types.Tool(google_search=types.GoogleSearch())]
