@@ -40,14 +40,26 @@ LOG = logging.getLogger("veille")
 
 PARIS = ZoneInfo("Europe/Paris")
 
-SENDER_EMAIL = os.getenv("SENDER_EMAIL", "veille@oliviercarre.fr")
-SENDER_NAME = os.getenv("SENDER_NAME", "Veille Logement Social")
-REPLY_TO = os.getenv("REPLY_TO", SENDER_EMAIL)
-LIST_ID_BREVO = int(os.getenv("BREVO_LIST_ID", "3"))
-DRY_RUN = os.getenv("DRY_RUN", "").strip() in {"1", "true", "True"}
+def env(nom: str, defaut: str = "") -> str:
+    """
+    Une variable définie mais vide vaut absente.
+
+    GitHub Actions substitue une chaîne vide à `${{ vars.X }}` quand la variable
+    de dépôt n'existe pas : `os.getenv(nom, defaut)` renverrait alors "" et non
+    le défaut, puisque la variable est bien présente dans l'environnement.
+    """
+    valeur = os.getenv(nom, "")
+    return valeur.strip() or defaut
+
+
+SENDER_EMAIL = env("SENDER_EMAIL", "veille@oliviercarre.fr")
+SENDER_NAME = env("SENDER_NAME", "Veille Logement Social")
+REPLY_TO = env("REPLY_TO", SENDER_EMAIL)
+LIST_ID_BREVO = int(env("BREVO_LIST_ID", "3"))
+DRY_RUN = env("DRY_RUN").lower() in {"1", "true", "yes"}
 
 # Modèle épinglé + repli sur l'alias mouvant si l'ID stable disparaît.
-MODELS = [os.getenv("GEMINI_MODEL", "gemini-3.6-flash"), "gemini-flash-latest"]
+MODELS = [env("GEMINI_MODEL", "gemini-3.6-flash"), "gemini-flash-latest"]
 
 BREVO_BASE = "https://api.brevo.com/v3"
 HTTP_TIMEOUT = 60
@@ -287,7 +299,7 @@ def main() -> int:
         level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
     )
 
-    manquantes = [k for k in ("GEMINI_API_KEY", "BREVO_API_KEY") if not os.getenv(k)]
+    manquantes = [k for k in ("GEMINI_API_KEY", "BREVO_API_KEY") if not env(k)]
     if manquantes:
         LOG.error("Variables d'environnement manquantes : %s", ", ".join(manquantes))
         return 2
