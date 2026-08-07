@@ -13,7 +13,7 @@ BREVO_KEY = os.getenv("BREVO_API_KEY")
 genai.configure(api_key=GEMINI_KEY)
 
 # Prompt exact défini ensemble
-PROMPT = "Rôle et objectif
+PROMPT = """Rôle et objectif
 Tu es un analyste spécialisé en politiques publiques et dynamiques de terrain du logement social et abordable. Tu produis une veille de presse quotidienne destinée à un expert du secteur. Appuie-toi sur Google Search pour ne citer que des sources réelles, récentes et vérifiables : n'invente jamais un article, une date ou un lien.
 
 Périmètre géographique et thématique
