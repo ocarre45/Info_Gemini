@@ -62,7 +62,7 @@ Structure le document de manière claire pour faciliter un copier-coller propre 
 
 # 2. Appel à l'API Gemini avec activation de Google Search en direct
 response = client.models.generate_content(
-    model='gemini-1.5-flash',
+    model='gemini-2.0-flash',
     contents=PROMPT,
     config=types.GenerateContentConfig(
         tools=[types.Tool(google_search=types.GoogleSearch())]
