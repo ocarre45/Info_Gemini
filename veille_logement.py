@@ -52,49 +52,54 @@ def env(nom: str, defaut: str = "") -> str:
     return valeur.strip() or defaut
 
 
-SENDER_EMAIL = env("SENDER_EMAIL", "ocfr@yahoo.fr")
+SENDER_EMAIL = env("SENDER_EMAIL", "veille@oliviercarre.fr")
 SENDER_NAME = env("SENDER_NAME", "Veille Logement Social")
 REPLY_TO = env("REPLY_TO", SENDER_EMAIL)
 LIST_ID_BREVO = int(env("BREVO_LIST_ID", "3"))
 DRY_RUN = env("DRY_RUN").lower() in {"1", "true", "yes"}
 
 # Modèle épinglé + repli sur l'alias mouvant si l'ID stable disparaît.
-MODELS = [env("GEMINI_MODEL", "gemini-3.6-flash"), "gemini-flash-latest"]
+MODELS = [env("GEMINI_MODEL", "gemini-3.6-pro"), "gemini-3.6-flash"]
 
 BREVO_BASE = "https://api.brevo.com/v3"
 HTTP_TIMEOUT = 60
 MAX_TO_PER_CALL = 99  # limite Brevo pour un envoi transactionnel
 
 
+SENTINELLE = "<!--DEBUT-->"
+
+
 def build_prompt(now: datetime) -> str:
-    """Le prompt embarque la date : le modèle n'a aucune notion de « aujourd'hui »."""
+    """
+    Prompt d'origine, restitué à l'identique.
+
+    Trois ajouts seulement, tous d'ordre mécanique et non éditorial : le bloc de
+    datation (le modèle ignore la date d'exécution, sans quoi « 24 dernières
+    heures » n'a aucun référent), la sentinelle de tête (bogue de troncature du
+    grounding Gemini) et l'interdiction explicite du Markdown (des puces en
+    astérisque avaient fui dans le rendu). Seule correction au texte : la graphie
+    italienne « pubblica », qui figurait en espagnol.
+    """
     debut = now - timedelta(hours=24)
     return f"""Rôle et objectif
-Tu es un analyste spécialisé en politiques publiques et dynamiques de terrain du logement social et abordable. Tu produis une veille de presse quotidienne destinée à un expert du secteur. Appuie-toi systématiquement sur Google Search pour ne citer que des sources réelles, récentes et vérifiables. N'invente jamais un article, une date ou une URL : si tu n'as pas trouvé la source par recherche, ne la cite pas.
-
-Fenêtre temporelle
-Nous sommes le {now.strftime('%A %d %B %Y')} à {now.strftime('%Hh%M')} (heure de Paris).
-Ne retiens que les informations publiées entre le {debut.strftime('%d/%m/%Y %Hh%M')} et maintenant.
-Indique la date de publication de chaque information. Si une information importante est légèrement antérieure à cette fenêtre, tu peux la retenir en la signalant explicitement par la mention « Antérieur à la période revue ».
+Tu es un analyste spécialisé en politiques publiques et dynamiques de terrain du logement social et abordable. Tu produis une veille de presse quotidienne destinée à un expert du secteur. Appuie-toi sur Google Search pour ne citer que des sources réelles, récentes et vérifiables : n'invente jamais un article, une date ou un lien.
 
 Périmètre géographique et thématique
 - Pays : France, Allemagne, Italie.
-- Sujet : logement social et abordable au sens large (macro-politiques ET vie locale / terrain).
-  • France : HLM, logement abordable et intermédiaire, bailleurs sociaux, financements (RLS, PLAI/PLUS/PLS, Action Logement, CDC / Banque des Territoires), arbitrages maires / préfets / collectivités, décisions judiciaires et expulsions, tensions de terrain, vie des organismes, santé financière, associations de locataires, précarité énergétique.
-  • Allemagne : sozialer Wohnungsbau, Sozialwohnungen, geförderter Wohnraum, Wohnraumförderung, kommunale und genossenschaftliche Wohnungsunternehmen, décisions des Länder et des communes, initiatives syndicales (DGB, Deutscher Mieterbund), reconversions, conflits d'usage.
-  • Italie : edilizia residenziale pubblica (ERP), case popolari, housing sociale, canone calmierato, bandi régionaux et municipaux (ALER, ATER), syndicats de locataires (SUNIA, Unione Inquilini), expulsions (sfratti), réhabilitations et initiatives locales.
+- Sujet : Logement social et abordable au sens large (macro-politiques ET vie locale/terrain).
+ • France : HLM, logement abordable/intermédiaire, bailleurs sociaux, financements (RLS, PLAI/PLUS/PLS, Action Logement, CDC), arbitrages maires/préfets/collectivités, décisions judiciaires/expulsions, tensions de terrain, vie des organismes, santé financière, associations de locataires, précarité énergétique.
+ • Allemagne : sozialer Wohnungsbau, Sozialwohnungen, geförderter Wohnraum, Wohnraumförderung, kommunale/genossenschaftliche Wohnungsunternehmen, décisions des Länder et communes, initiatives syndicales (DGB/Mieterbund), reconversions, conflits d'usage.
+ • Italie : edilizia residenziale pubblica (ERP), case popolari, housing sociale, canone calmierato, bandi régionaux/municipaux (ALER, ATER), syndicats de locataires (SUNIA, Unione Inquilini), expulsions (sfratti), réhabilitations et initiatives locales.
 
 Sélection et signaux faibles
-- Ne te limite pas aux annonces ministérielles ni aux grandes lois. Recherche activement les signaux faibles et la presse régionale et locale.
-- Sélectionne jusqu'à 20 informations au total, classées par pays puis par ordre d'importance décroissante.
-- Précise toujours la nature exacte des financements évoqués.
-- Pas de formules subjectives ni de qualificatifs d'appréciation. N'emploie pas le mot « marché » pour désigner un pays.
-- Mentionne le drapeau et le nom du pays une seule fois, en tête de chaque section.
+- Ne te limite PAS aux annonces ministérielles ou aux grandes lois. Recherche activement les SIGNAUX FAIBLES et la PRESSE RÉGIONALE/LOCALE.
+- Formule tes requêtes de recherche dans la langue du pays traité : en allemand pour l'Allemagne, en italien pour l'Italie, jamais en français. Lis les articles dans leur langue d'origine et restitue-les en français. Croise les termes du périmètre ci-dessus avec des noms de villes, de Länder, de régions et d'organismes locaux.
+- Sélectionne jusqu'à 20 informations au total.
+- Fenêtre temporelle : 24 dernières heures. Nous sommes le {now.strftime('%d/%m/%Y')} à {now.strftime('%Hh%M')} (heure de Paris) : ne retiens que ce qui a été publié après le {debut.strftime('%d/%m/%Y %Hh%M')}.
 
-Format de sortie
-Produis directement du HTML simple : <h2>, <h3>, <ul>, <li>, <b>, <a href="...">.
-Chaque information : titre en <b>, résumé de 2 à 3 phrases, puis source et date sous la forme <i>Source — JJ/MM/AAAA</i> avec un lien <a href> vers l'article.
-N'entoure pas la sortie de balises Markdown (```html ou ```). Ne produis ni <html>, ni <head>, ni <body>.
+Structure et mise en forme HTML :
+Ta réponse commence exactement par {SENTINELLE} et par rien d'autre : aucun préambule, aucun espace avant.
+Génère ensuite le texte directement formaté en HTML simple (utilise <h2>, <h3>, <ul>, <li>, <b>, <a href="...">) pour qu'il s'affiche parfaitement dans un e-mail. Ne mets pas de balises ```html ou ``` autour. N'utilise aucun Markdown : jamais de * ni de # pour structurer. Chaque balise <a> doit être complète et sur une seule ligne, avec l'URL entière entre guillemets doubles.
 """
 
 
@@ -103,32 +108,49 @@ N'entoure pas la sortie de balises Markdown (```html ou ```). Ne produis ni <htm
 # --------------------------------------------------------------------------- #
 
 FENCE_RE = re.compile(r"^\s*```(?:html)?\s*|\s*```\s*$", re.IGNORECASE)
+MARKDOWN_PUCE_RE = re.compile(r"^[ \t]*[\*\-\u2022]+[ \t]+", re.MULTILINE)
 
 
 def strip_fences(text: str) -> str:
-    """Retire uniquement les clôtures de bloc en tête et en fin, pas les backticks internes."""
     return FENCE_RE.sub("", text).strip()
 
 
 def extract_text(response) -> str:
-    """`response.text` peut être None (blocage, aucune part texte). On explicite l'échec."""
     if not response.candidates:
-        raise RuntimeError("Réponse Gemini sans candidat (probable blocage de sécurité).")
-
+        raise RuntimeError("Réponse sans candidat (probable blocage de sécurité).")
     candidate = response.candidates[0]
     finish = getattr(candidate, "finish_reason", None)
     if finish and str(finish).upper().endswith("MAX_TOKENS"):
-        LOG.warning("Réponse tronquée (MAX_TOKENS) — augmenter max_output_tokens.")
-
+        LOG.warning("Réponse tronquée en fin (MAX_TOKENS).")
     parts = getattr(candidate.content, "parts", None) or []
     chunks = [p.text for p in parts if getattr(p, "text", None)]
     if not chunks:
-        raise RuntimeError(f"Réponse Gemini sans contenu textuel (finish_reason={finish}).")
+        raise RuntimeError(f"Réponse sans contenu textuel (finish_reason={finish}).")
     return "".join(chunks)
 
 
+def valider(texte: str) -> str:
+    """
+    Garde-fou contre la troncature de tête du grounding Gemini.
+
+    Bogue documenté sur les variantes Flash 3.5 et 3.6 : la partie textuelle peut
+    arriver amputée de son début, sans que rien dans la réponse ne le signale.
+    """
+    texte = strip_fences(texte)
+    if not texte.startswith(SENTINELLE):
+        apercu = texte[:120].replace("\n", " ")
+        raise RuntimeError(f"Sentinelle absente — début de réponse perdu. Reçu : « {apercu} »")
+    texte = texte[len(SENTINELLE) :].strip()
+    if len(texte) < 500:
+        raise RuntimeError(f"Contenu anormalement court ({len(texte)} caractères).")
+    if MARKDOWN_PUCE_RE.search(texte):
+        raise RuntimeError("Puces Markdown détectées : le format HTML n'a pas été respecté.")
+    if texte.count("<a ") != texte.count("</a>"):
+        raise RuntimeError("Balises <a> déséquilibrées : HTML malformé.")
+    return texte
+
+
 def extract_sources(response) -> list[tuple[str, str]]:
-    """Sources effectivement consultées par le grounding : le seul garde-fou anti-hallucination."""
     out: list[tuple[str, str]] = []
     for candidate in response.candidates or []:
         meta = getattr(candidate, "grounding_metadata", None)
@@ -136,13 +158,11 @@ def extract_sources(response) -> list[tuple[str, str]]:
             web = getattr(chunk, "web", None)
             if web and getattr(web, "uri", None):
                 out.append((web.title or web.uri, web.uri))
-    # dédoublonnage en conservant l'ordre
     seen: set[str] = set()
     return [(t, u) for t, u in out if not (u in seen or seen.add(u))]
 
 
 def extract_search_entry_point(response) -> str:
-    """Les conditions d'utilisation du grounding imposent d'afficher les Search Suggestions."""
     for candidate in response.candidates or []:
         meta = getattr(candidate, "grounding_metadata", None)
         sep = getattr(meta, "search_entry_point", None)
@@ -156,30 +176,28 @@ def generate(now: datetime) -> tuple[str, list[tuple[str, str]], str]:
     client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
     config = types.GenerateContentConfig(
         tools=[types.Tool(google_search=types.GoogleSearch())],
-        temperature=0.2,
-        max_output_tokens=8192,
+        temperature=0.3,
+        max_output_tokens=16384,
     )
     prompt = build_prompt(now)
-    last_error: Exception | None = None
+    derniere: Exception | None = None
 
     for model_name in MODELS:
-        for attempt in range(1, 4):
+        for tentative in range(1, 4):
             try:
-                LOG.info("Génération : %s (tentative %d)", model_name, attempt)
+                LOG.info("Génération : %s (tentative %d)", model_name, tentative)
                 response = client.models.generate_content(
                     model=model_name, contents=prompt, config=config
                 )
-                html = strip_fences(extract_text(response))
-                if len(html) < 400:
-                    raise RuntimeError(f"Contenu anormalement court ({len(html)} caractères).")
+                html = valider(extract_text(response))
                 LOG.info("Succès avec %s (%d caractères).", model_name, len(html))
                 return html, extract_sources(response), extract_search_entry_point(response)
             except Exception as exc:  # noqa: BLE001
-                last_error = exc
-                LOG.warning("Échec %s tentative %d : %s", model_name, attempt, exc)
-                time.sleep(5 * attempt)
+                derniere = exc
+                LOG.warning("Échec %s tentative %d : %s", model_name, tentative, exc)
+                time.sleep(5 * tentative)
 
-    raise RuntimeError(f"Génération impossible sur tous les modèles. Dernière erreur : {last_error}")
+    raise RuntimeError(f"Génération impossible. Dernière erreur : {derniere}")
 
 
 # --------------------------------------------------------------------------- #
