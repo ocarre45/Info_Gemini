@@ -52,7 +52,7 @@ def env(nom: str, defaut: str = "") -> str:
     return valeur.strip() or defaut
 
 
-SENDER_EMAIL = env("SENDER_EMAIL", "veille@oliviercarre.fr")
+SENDER_EMAIL = env("SENDER_EMAIL", "ocfr@yahoo.fr")
 SENDER_NAME = env("SENDER_NAME", "Veille Logement Social")
 REPLY_TO = env("REPLY_TO", SENDER_EMAIL)
 LIST_ID_BREVO = int(env("BREVO_LIST_ID", "3"))
